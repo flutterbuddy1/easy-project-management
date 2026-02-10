@@ -4,11 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && npm run build:socket",
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "socket": "ts-node --skip-project socket-server.ts"
+    "socket": "node dist/socket-server.js",
+    "socket:dev": "ts-node --skip-project socket-server.ts",
+    "build:socket": "tsc socket-server.ts --outDir dist --module commonjs --esModuleInterop --skipLibCheck"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
