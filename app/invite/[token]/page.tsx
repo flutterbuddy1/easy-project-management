@@ -111,7 +111,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
                     <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
                         <Mail className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <CardTitle className="text-2xl">You're Invited!</CardTitle>
+                    <CardTitle className="text-2xl">You&apos;re Invited!</CardTitle>
                     <CardDescription>
                         Join your team on the Project Management Platform
                     </CardDescription>

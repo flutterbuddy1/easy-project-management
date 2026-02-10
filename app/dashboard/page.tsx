@@ -109,7 +109,7 @@ export default async function DashboardPage() {
                     Welcome back, {user.fullName || 'User'}!
                 </h1>
                 <p className="text-muted-foreground mt-1">
-                    Here's what's happening with your projects today.
+                    Here&apos;s what&apos;s happening with your projects today.
                 </p>
             </div>
 

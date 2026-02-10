@@ -83,7 +83,7 @@ export default async function NotificationsPage() {
                         <CheckCircle2 className="h-16 w-16 text-muted-foreground mb-4" />
                         <h3 className="text-lg font-semibold mb-2">All caught up!</h3>
                         <p className="text-muted-foreground text-center">
-                            You don't have any notifications at the moment
+                            You don&apos;t have any notifications at the moment
                         </p>
                     </CardContent>
                 </Card>
