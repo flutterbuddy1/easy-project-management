@@ -28,7 +28,8 @@ export default async function DashboardLayout({
     })
 
     if (!user) {
-        redirect('/auth/login')
+        // Redirect to error page instead of login to avoid loop with middleware
+        redirect('/auth/error?error=UserNotFound')
     }
 
     return (
