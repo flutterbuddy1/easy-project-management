@@ -24,7 +24,10 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         if (socketRef.current) return
 
         // Connect to socket server
-        const socketInstance = io('http://localhost:4000', {
+        // Use environment variable or fallback to same host on port 4000 (if local) or relative path
+        const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000'
+
+        const socketInstance = io(socketUrl, {
             transports: ['websocket'],
             reconnectionAttempts: 5,
             reconnectionDelay: 1000,
