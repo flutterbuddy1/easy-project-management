@@ -37,4 +37,21 @@ export const authConfig = {
         },
     },
     providers: [], // Configured in auth.ts
+    session: {
+        strategy: "jwt",
+    },
+    secret: process.env.NEXTAUTH_SECRET,
+    trustHost: true,
+    cookies: {
+        sessionToken: {
+            name: `next-auth.session-token`,
+            options: {
+                httpOnly: true,
+                sameSite: 'lax',
+                path: '/',
+                // Force secure to false if using HTTP, otherwise default to true in production
+                secure: process.env.NEXTAUTH_URL?.startsWith('https://'),
+            },
+        },
+    },
 } satisfies NextAuthConfig
