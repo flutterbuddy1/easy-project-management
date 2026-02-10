@@ -151,9 +151,19 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
                     <TaskDescription task={task} />
 
                     {/* Comments */}
+                    {/* Comments */}
                     <TaskComments
                         taskId={task.id}
-                        comments={comments}
+                        comments={comments.map(c => ({
+                            ...c,
+                            createdAt: c.createdAt.toISOString(),
+                            updatedAt: c.updatedAt.toISOString(),
+                            user: {
+                                ...c.user,
+                                fullName: c.user.fullName,
+                                avatarUrl: c.user.avatarUrl
+                            }
+                        }))}
                         currentUserId={session.user.id}
                     />
                 </div>

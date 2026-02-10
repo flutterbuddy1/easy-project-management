@@ -12,13 +12,13 @@ import { createComment, updateComment, deleteComment } from '@/app/actions/comme
 interface Comment {
     id: string
     content: string
-    created_at: string
-    updated_at: string
+    createdAt: string
+    updatedAt: string
     user: {
         id: string
         email: string
-        full_name: string | null
-        avatar_url: string | null
+        fullName: string | null
+        avatarUrl: string | null
     }
 }
 
@@ -101,18 +101,18 @@ export function TaskComments({ taskId, comments, currentUserId }: TaskCommentsPr
                         {comments.map((comment) => (
                             <div key={comment.id} className="flex gap-3">
                                 <Avatar className="h-8 w-8 flex-shrink-0">
-                                    <AvatarImage src={comment.user.avatar_url || ''} />
+                                    <AvatarImage src={comment.user.avatarUrl || ''} />
                                     <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white text-xs">
-                                        {comment.user.full_name?.charAt(0) || comment.user.email.charAt(0)}
+                                        {comment.user.fullName?.charAt(0) || comment.user.email.charAt(0)}
                                     </AvatarFallback>
                                 </Avatar>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="font-medium text-sm">
-                                            {comment.user.full_name || comment.user.email}
+                                            {comment.user.fullName || comment.user.email}
                                         </span>
                                         <span className="text-xs text-muted-foreground">
-                                            {new Date(comment.created_at).toLocaleString()}
+                                            {new Date(comment.createdAt).toLocaleString()}
                                         </span>
                                     </div>
                                     {editingId === comment.id ? (
