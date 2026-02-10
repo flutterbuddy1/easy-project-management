@@ -13,7 +13,12 @@ export async function createComment(taskId: string, content: string) {
 
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
-            select: { id: true, organizationId: true }
+            select: {
+                id: true,
+                organizationId: true,
+                fullName: true,
+                email: true
+            }
         })
 
         if (!user || !user.organizationId) {
