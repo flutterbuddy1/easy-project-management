@@ -22,7 +22,12 @@ export async function createTask(data: CreateTaskData) {
 
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
-            select: { id: true, organizationId: true }
+            select: {
+                id: true,
+                organizationId: true,
+                fullName: true,
+                email: true
+            }
         })
 
         if (!user || !user.organizationId) {
@@ -70,13 +75,13 @@ export async function createTask(data: CreateTaskData) {
                     assigneeName: assignee.fullName || 'User',
                     taskTitle: task.title,
                     projectName: project.name,
-                    assignerName: user.name || user.email, // Using user from auth session which has 'name' or DB user which has 'fullName'?
+                    assignerName: user.fullName || user.email,
                     // Session user type might be different, let's use the DB user we fetched
                     link: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/tasks/${task.id}`
                 })
                 // Fix assigner name using fetched user
-                emailData.html = emailData.html.replace(user.name || user.email || '', (user as any).fullName || user.email)
-                emailData.text = emailData.text.replace(user.name || user.email || '', (user as any).fullName || user.email)
+                emailData.html = emailData.html.replace(user.fullName || user.email || '', (user as any).fullName || user.email)
+                emailData.text = emailData.text.replace(user.fullName || user.email || '', (user as any).fullName || user.email)
 
                 await createNotification({
                     userId: data.assigneeId,

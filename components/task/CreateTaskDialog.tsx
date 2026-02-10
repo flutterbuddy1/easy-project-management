@@ -81,7 +81,7 @@ export function CreateTaskDialog({ projectId: propProjectId, status = 'todo', op
                 projectId: selectedProjectId,
                 status: taskStatus,
                 priority,
-                assigneeId: assignedTo === 'unassigned' ? undefined : assignedTo
+                assigneeId: assignedTo === 'unassigned' ? null : assignedTo
             })
 
             if (result.success) {

@@ -20,6 +20,7 @@ export async function createInvitation(email: string, role: string) {
                 fullName: true,
                 organizationId: true,
                 role: true,
+                email: true,
                 organization: {
                     select: { name: true }
                 }
@@ -220,6 +221,7 @@ export async function resendInvitation(id: string) {
                 fullName: true,
                 organizationId: true,
                 role: true,
+                email: true,
                 organization: {
                     select: { name: true }
                 }

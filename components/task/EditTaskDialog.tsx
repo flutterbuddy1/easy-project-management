@@ -31,8 +31,8 @@ interface EditTaskDialogProps {
         description: string | null
         status: string
         priority: string
-        assigned_to: string | null
-        project_id: string
+        assigneeId: string | null
+        projectId: string
     }
     users?: Array<{ id: string; email: string }>
     trigger?: React.ReactNode
@@ -44,7 +44,7 @@ export function EditTaskDialog({ task, users = [], trigger }: EditTaskDialogProp
     const [description, setDescription] = useState(task.description || '')
     const [status, setStatus] = useState(task.status)
     const [priority, setPriority] = useState(task.priority)
-    const [assignedTo, setAssignedTo] = useState(task.assigned_to || '')
+    const [assignedTo, setAssignedTo] = useState(task.assigneeId || '')
     const [isLoading, setIsLoading] = useState(false)
     const router = useRouter()
 
@@ -59,8 +59,8 @@ export function EditTaskDialog({ task, users = [], trigger }: EditTaskDialogProp
             description: description || null,
             status,
             priority,
-            assigned_to: assignedTo === 'unassigned' || !assignedTo ? null : assignedTo,
-            project_id: task.project_id,
+            assigneeId: assignedTo === 'unassigned' || !assignedTo ? null : assignedTo,
+            projectId: task.projectId,
         })
 
         if (result.success) {

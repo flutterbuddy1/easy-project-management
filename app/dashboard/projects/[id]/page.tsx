@@ -94,7 +94,15 @@ export default async function ProjectDetailPage({
             </div>
 
             {/* Kanban Board */}
-            <KanbanBoard tasks={tasks || []} projectId={params.id} />
+            <KanbanBoard
+                tasks={tasks.map(t => ({
+                    ...t,
+                    dueDate: t.dueDate ? t.dueDate.toISOString() : null,
+                    createdAt: t.createdAt.toISOString(),
+                    updatedAt: t.updatedAt.toISOString()
+                }))}
+                projectId={params.id}
+            />
 
             {/* Real-time Chat Widget */}
             <ProjectChat

@@ -15,8 +15,8 @@ interface TaskDescriptionProps {
         description: string | null
         status: string
         priority: string
-        assigned_to: string | null
-        project_id: string
+        assigneeId: string | null
+        projectId: string
     }
 }
 
@@ -34,8 +34,8 @@ export function TaskDescription({ task }: TaskDescriptionProps) {
             description: description || null,
             status: task.status,
             priority: task.priority,
-            assigned_to: task.assigned_to,
-            project_id: task.project_id,
+            assigneeId: task.assigneeId,
+            projectId: task.projectId,
         })
 
         if (result.success) {

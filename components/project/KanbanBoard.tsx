@@ -49,12 +49,12 @@ interface Task {
     description: string | null
     status: string
     priority: string
-    assigned_to: string | null
-    due_date: string | null
+    assigneeId: string | null
+    dueDate: string | null
     position: number
-    project_id: string
-    created_at: string
-    updated_at: string
+    projectId: string
+    createdAt: string
+    updatedAt: string
     assignee?: {
         id: string
         fullName: string | null
