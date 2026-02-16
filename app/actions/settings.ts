@@ -5,14 +5,17 @@ import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import bcrypt from 'bcryptjs'
 
-export async function updateProfile(data: { fullName: string }) {
+export async function updateProfile(data: { fullName: string, emailNotifications?: boolean }) {
     try {
         const session = await auth()
         if (!session?.user?.email) return { success: false, error: 'Not authenticated' }
 
         await prisma.user.update({
             where: { email: session.user.email },
-            data: { fullName: data.fullName }
+            data: {
+                fullName: data.fullName,
+                emailNotifications: data.emailNotifications
+            }
         })
 
         revalidatePath('/dashboard/settings')

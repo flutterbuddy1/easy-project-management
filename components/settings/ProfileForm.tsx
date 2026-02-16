@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { updateProfile } from '@/app/actions/settings'
 import { useToast } from '@/hooks/use-toast'
+import { Switch } from '@/components/ui/switch'
 
 interface ProfileFormProps {
     user: {
@@ -14,11 +15,13 @@ interface ProfileFormProps {
         email: string
         role: string
         avatarUrl: string | null
+        emailNotifications: boolean
     }
 }
 
 export function ProfileForm({ user }: ProfileFormProps) {
     const [isLoading, setIsLoading] = useState(false)
+    const [emailNotifications, setEmailNotifications] = useState(user.emailNotifications)
     const { toast } = useToast()
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -28,7 +31,10 @@ export function ProfileForm({ user }: ProfileFormProps) {
         const formData = new FormData(e.currentTarget)
         const fullName = formData.get('fullName') as string
 
-        const result = await updateProfile({ fullName })
+        const result = await updateProfile({
+            fullName,
+            emailNotifications
+        })
 
         if (result.success) {
             toast({
@@ -94,6 +100,20 @@ export function ProfileForm({ user }: ProfileFormProps) {
                         id="role"
                         defaultValue={user.role || ''}
                         disabled
+                    />
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                        <Label className="text-base">Email Notifications</Label>
+                        <p className="text-sm text-muted-foreground">
+                            Receive emails about task assignments and comments
+                        </p>
+                    </div>
+                    <Switch
+                        checked={emailNotifications}
+                        onCheckedChange={setEmailNotifications}
+                        disabled={isLoading}
                     />
                 </div>
             </div>

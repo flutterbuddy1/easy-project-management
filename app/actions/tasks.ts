@@ -26,7 +26,8 @@ export async function createTask(data: CreateTaskData) {
                 id: true,
                 organizationId: true,
                 fullName: true,
-                email: true
+                email: true,
+                role: true
             }
         })
 
@@ -44,6 +45,11 @@ export async function createTask(data: CreateTaskData) {
 
         if (!project) {
             return { success: false, error: 'Project not found' }
+        }
+
+        const { hasPermission, PERMISSIONS } = await import('@/lib/permissions')
+        if (!hasPermission(user.role, PERMISSIONS.CREATE_TASK)) {
+            return { success: false, error: 'Unauthorized: Insufficient permissions' }
         }
 
         // Create task
@@ -98,7 +104,7 @@ export async function createTask(data: CreateTaskData) {
         return { success: true, task }
     } catch (error) {
         console.error('Error in createTask:', error)
-        return { success: false, error: 'Failed to create task' }
+        return { success: false, error: `Failed to create task: ${error instanceof Error ? error.message : String(error)}` }
     }
 }
 
@@ -173,7 +179,11 @@ export async function updateTaskStatus(taskId: string, newStatus: string) {
 
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
-            select: { id: true, organizationId: true }
+            select: {
+                id: true,
+                organizationId: true,
+                role: true
+            }
         })
 
         if (!user || !user.organizationId) {
@@ -192,6 +202,13 @@ export async function updateTaskStatus(taskId: string, newStatus: string) {
 
         if (!task) {
             return { success: false, error: 'Task not found' }
+        }
+
+        const { hasPermission, PERMISSIONS } = await import('@/lib/permissions')
+        // Improving granularity: check general UPDATE_TASK or specific status update if needed. 
+        // For now, UPDATE_TASK covers all.
+        if (!hasPermission(user.role, PERMISSIONS.UPDATE_TASK)) {
+            return { success: false, error: 'Unauthorized: Insufficient permissions' }
         }
 
         // Update task status
@@ -220,7 +237,7 @@ export async function updateTaskStatus(taskId: string, newStatus: string) {
         return { success: true }
     } catch (error) {
         console.error('Error in updateTaskStatus:', error)
-        return { success: false, error: 'Failed to update task status' }
+        return { success: false, error: `Failed to update task status: ${error instanceof Error ? error.message : String(error)}` }
     }
 }
 
@@ -242,7 +259,13 @@ export async function updateTask(id: string, data: UpdateTaskData) {
 
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
-            select: { id: true, organizationId: true }
+            select: {
+                id: true,
+                organizationId: true,
+                fullName: true,
+                email: true,
+                role: true
+            }
         })
 
         if (!user || !user.organizationId) {
@@ -263,8 +286,13 @@ export async function updateTask(id: string, data: UpdateTaskData) {
             return { success: false, error: 'Task not found' }
         }
 
+        const { hasPermission, PERMISSIONS } = await import('@/lib/permissions')
+        if (!hasPermission(user.role, PERMISSIONS.UPDATE_TASK)) {
+            return { success: false, error: 'Unauthorized: Insufficient permissions' }
+        }
+
         // Update task
-        await prisma.task.update({
+        const updatedTask = await prisma.task.update({
             where: { id },
             data: {
                 title: data.title,
@@ -275,15 +303,89 @@ export async function updateTask(id: string, data: UpdateTaskData) {
             }
         })
 
+        // Generate System Comments for changes
+        const updates = []
+        if (task.status !== data.status) {
+            updates.push(`changed status from ${task.status} to ${data.status}`)
+        }
+        if (task.priority !== data.priority) {
+            updates.push(`changed priority from ${task.priority} to ${data.priority}`)
+        }
+        if (task.assigneeId !== data.assigneeId) {
+            if (data.assigneeId) {
+                const assignee = await prisma.user.findUnique({
+                    where: { id: data.assigneeId },
+                    select: { fullName: true, email: true, emailNotifications: true }
+                })
+                const assigneeName = assignee ? (assignee.fullName || assignee.email) : 'user'
+                updates.push(`assigned to ${assigneeName}`)
+
+                // Send Email Notification
+                if (assignee?.email && assignee?.emailNotifications) {
+                    const project = await prisma.project.findUnique({
+                        where: { id: task.projectId },
+                        select: { name: true }
+                    })
+
+                    const assignerName = user.fullName || user.email || 'Admin'
+
+                    // Fire and forget email
+                    const emailData = {
+                        to: assignee.email,
+                        assigneeName: assigneeName,
+                        taskTitle: updatedTask.title,
+                        projectName: project?.name || 'Project',
+                        assignerName,
+                        link: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/tasks/${id}`
+                    }
+                    // Import dynamically or at top? Top is better. I'll rely on IDE to auto-import or I will add the import myself.
+                    // Since I can't interactively add import, I will use a separate replace_file_content for import if needed, 
+                    // or assume `sendTaskAssignedEmail` is available if I added it.
+                    // Wait, I need to add the import statement at the top of the file as well.
+                    // I will do this in two steps or one large step. 
+                    // Let's call the function here, and I'll add the import in the next tool call to be safe/clean.
+                    import('@/lib/email').then(({ sendTaskAssignedEmail }) => {
+                        sendTaskAssignedEmail(emailData).catch(err => console.error('Failed to send email:', err))
+                    })
+                }
+            } else {
+                updates.push(`removed assignee`)
+            }
+        }
+
+        let systemComment = null;
+        if (updates.length > 0) {
+            const userName = user.fullName || user.email || 'User'
+            systemComment = await prisma.comment.create({
+                data: {
+                    content: `${userName} ${updates.join(', ')}`,
+                    taskId: id,
+                    userId: user.id,
+                    // @ts-ignore
+                    type: 'system'
+                },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            email: true,
+                            fullName: true,
+                            avatarUrl: true
+                        }
+                    }
+                }
+            })
+        }
+
         revalidatePath('/dashboard/projects')
         revalidatePath(`/dashboard/projects/${data.projectId}`)
         revalidatePath('/dashboard/tasks')
         revalidatePath(`/dashboard/tasks/${id}`)
 
-        return { success: true }
+        return { success: true, systemComment }
     } catch (error) {
         console.error('Error in updateTask:', error)
-        return { success: false, error: 'Failed to update task' }
+        return { success: false, error: `Failed to update task: ${error instanceof Error ? error.message : String(error)}` }
     }
 }
 
@@ -296,7 +398,11 @@ export async function deleteTask(id: string) {
 
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
-            select: { id: true, organizationId: true }
+            select: {
+                id: true,
+                organizationId: true,
+                role: true
+            }
         })
 
         if (!user || !user.organizationId) {
@@ -315,6 +421,11 @@ export async function deleteTask(id: string) {
 
         if (!task) {
             return { success: false, error: 'Task not found' }
+        }
+
+        const { hasPermission, PERMISSIONS } = await import('@/lib/permissions')
+        if (!hasPermission(user.role, PERMISSIONS.DELETE_TASK)) {
+            return { success: false, error: 'Unauthorized: Insufficient permissions' }
         }
 
         // Delete task (cascades to comments)
@@ -328,6 +439,6 @@ export async function deleteTask(id: string) {
         return { success: true }
     } catch (error) {
         console.error('Error in deleteTask:', error)
-        return { success: false, error: 'Failed to delete task' }
+        return { success: false, error: `Failed to delete task: ${error instanceof Error ? error.message : String(error)}` }
     }
 }

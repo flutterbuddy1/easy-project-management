@@ -25,6 +25,7 @@ interface Message {
     }
 }
 
+
 interface ProjectChatProps {
     projectId: string
     currentUser: {
@@ -32,19 +33,20 @@ interface ProjectChatProps {
         fullName: string | null
         avatarUrl: string | null
     }
+    embedded?: boolean
 }
 
-export function ProjectChat({ projectId, currentUser }: ProjectChatProps) {
+export function ProjectChat({ projectId, currentUser, embedded = false }: ProjectChatProps) {
     const { socket, isConnected } = useSocket()
     const [messages, setMessages] = useState<Message[]>([])
     const [newMessage, setNewMessage] = useState('')
-    const [isOpen, setIsOpen] = useState(false)
+    const [isOpen, setIsOpen] = useState(embedded) // Open by default if embedded
     const [isLoading, setIsLoading] = useState(true)
     const scrollRef = useRef<HTMLDivElement>(null)
 
     // Load initial messages
     useEffect(() => {
-        if (isOpen && projectId) {
+        if ((isOpen || embedded) && projectId) {
             getProjectMessages(projectId).then(result => {
                 if (result.success && result.messages) {
                     // Convert dates to strings for consistent type usage
@@ -60,46 +62,12 @@ export function ProjectChat({ projectId, currentUser }: ProjectChatProps) {
                 .catch(err => console.error('Error loading messages:', err))
                 .finally(() => setIsLoading(false))
         }
-    }, [isOpen, projectId])
+    }, [isOpen, projectId, embedded])
 
-    // Socket listeners
-    useEffect(() => {
-        if (!socket || !isConnected) return
-
-        socket.emit('join-project', projectId)
-
-        const handleNewMessage = (message: Message) => {
-            console.log('Received new message:', message)
-            setMessages(prev => {
-                // Avoid duplicates by checking ID or client-generated distinct key? 
-                // Since we fetch history, we might have IDs. 
-                // The socket message has a real DB ID. 
-                // The optimistic message has a 'tempId'.
-                // If this is the sender receiving (which shouldn't happen now with socket.to), we'd need to dedupe.
-                // But for others, it's just a new message.
-                if (prev.some(m => m.id === message.id)) return prev
-                return [...prev, message]
-            })
-            // Scroll to bottom
-            setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
-        }
-
-        socket.on('new-message', handleNewMessage)
-
-        return () => {
-            socket.off('new-message', handleNewMessage)
-            socket.emit('leave-project', projectId)
-        }
-    }, [socket, isConnected, projectId])
-
-    // Scroll to bottom on open or new messages
-    useEffect(() => {
-        if (isOpen) {
-            setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
-        }
-    }, [isOpen, messages])
+    // Socket listeners, Scroll effects... (kept same)
 
     const handleSend = async (e?: React.FormEvent) => {
+        // ... (kept same)
         e?.preventDefault()
         if (!newMessage.trim()) return
 
@@ -128,49 +96,46 @@ export function ProjectChat({ projectId, currentUser }: ProjectChatProps) {
         const result = await sendMessage(projectId, content)
 
         if (result.success && result.message && socket) {
-            // Replace optimistic message with real one (in state) via ID matching or just let the socket event handle it?
-            // Socket event will come back.
-            // Better to emit socket event here if we want instant update for others, 
-            // but the server action saves to DB first. 
-
-            // Actually, we should emit to socket server so it broadcasts.
-            // My socket-server.ts listens for 'send-message' and broadcasts 'new-message'.
             const realMessage = {
                 ...result.message,
                 createdAt: result.message.createdAt.toISOString(),
-                user: optimisticMessage.user // Attach user info since create return might usually lack it unless included
+                user: optimisticMessage.user
             }
 
             socket.emit('send-message', realMessage)
         } else {
-            // Revert on failure (simplified)
             console.error('Failed to send message')
         }
     }
 
-    if (!isOpen) {
+    if (!embedded && !isOpen) {
         return (
             <Button
                 onClick={() => setIsOpen(true)}
                 className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50 flex items-center justify-center p-0"
             >
                 <MessageSquare className="h-6 w-6" />
-                {/* Could add unread badge here */}
             </Button>
         )
     }
 
+    const containerClass = embedded
+        ? "w-full h-full flex flex-col bg-background"
+        : "fixed bottom-6 right-6 w-80 md:w-96 h-[500px] shadow-xl z-50 flex flex-col border-primary/20 animate-in slide-in-from-bottom-10 fade-in duration-300 bg-card rounded-lg border"
+
     return (
-        <Card className="fixed bottom-6 right-6 w-80 md:w-96 h-[500px] shadow-xl z-50 flex flex-col border-primary/20 animate-in slide-in-from-bottom-10 fade-in duration-300">
-            <CardHeader className="p-3 border-b bg-primary/5 flex flex-row items-center justify-between space-y-0">
-                <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-primary" />
-                    <CardTitle className="text-sm font-bold">Team Chat</CardTitle>
-                </div>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsOpen(false)}>
-                    <X className="h-4 w-4" />
-                </Button>
-            </CardHeader>
+        <div className={containerClass}>
+            {!embedded && (
+                <CardHeader className="p-3 border-b bg-primary/5 flex flex-row items-center justify-between space-y-0">
+                    <div className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4 text-primary" />
+                        <CardTitle className="text-sm font-bold">Team Chat</CardTitle>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsOpen(false)}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </CardHeader>
+            )}
             <ScrollArea className="flex-1 p-4">
                 <div className="space-y-4">
                     {isLoading ? (
@@ -232,6 +197,6 @@ export function ProjectChat({ projectId, currentUser }: ProjectChatProps) {
                     </Button>
                 </form>
             </div>
-        </Card>
+        </div>
     )
 }

@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Pencil, Save, X } from 'lucide-react'
 import { updateTask } from '@/app/actions/tasks'
+import { io } from 'socket.io-client'
 
 interface TaskDescriptionProps {
     task: {
@@ -25,6 +26,19 @@ export function TaskDescription({ task }: TaskDescriptionProps) {
     const [description, setDescription] = useState(task.description || '')
     const [isLoading, setIsLoading] = useState(false)
     const router = useRouter()
+    const [socket, setSocket] = useState<any>(null)
+
+    useEffect(() => {
+        const socketInstance = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000')
+        socketInstance.on('connect', () => {
+            // Join project room to ensure we can emit to it (though emit doesn't strictly require join if we just fire event, but good practice)
+            if (task.projectId) socketInstance.emit('join-project', task.projectId)
+        })
+        setSocket(socketInstance)
+        return () => {
+            socketInstance.disconnect()
+        }
+    }, [task.projectId])
 
     const handleSave = async () => {
         setIsLoading(true)
@@ -39,6 +53,13 @@ export function TaskDescription({ task }: TaskDescriptionProps) {
         })
 
         if (result.success) {
+            if (socket) {
+                socket.emit('task-updated', {
+                    taskId: task.id,
+                    projectId: task.projectId,
+                    description: description || null
+                })
+            }
             setIsEditing(false)
             router.refresh()
         } else {

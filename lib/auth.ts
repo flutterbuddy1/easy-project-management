@@ -13,6 +13,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     session: {
         strategy: "jwt",
     },
+    cookies: {
+        sessionToken: {
+            name: `next-auth.session-token`,
+            options: {
+                httpOnly: true,
+                sameSite: 'lax',
+                path: '/',
+                secure: process.env.NODE_ENV === 'production',
+            },
+        },
+    },
     providers: [
         Google({
             clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -53,8 +64,43 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     email: user.email,
                     name: user.fullName,
                     image: user.avatarUrl,
+                    role: user.role,
                 }
             },
         }),
     ],
+    callbacks: {
+        ...authConfig.callbacks,
+        async jwt({ token, user, trigger, session }: { token: any, user: any, trigger?: string, session?: any }) {
+            // Initial sign in
+            if (user) {
+                token.id = user.id
+                token.role = user.role
+                token.organizationId = user.organizationId
+            }
+
+            // Refetch user data on session update
+            if (trigger === "update" && token.sub) {
+                const freshUser = await prisma.user.findUnique({
+                    where: { id: token.sub },
+                    select: { role: true, organizationId: true }
+                })
+
+                if (freshUser) {
+                    token.role = freshUser.role
+                    token.organizationId = freshUser.organizationId
+                }
+            }
+
+            return token
+        },
+        async session({ session, token }: { session: any, token: any }) {
+            if (session.user && token.sub) {
+                session.user.id = token.sub
+                session.user.role = token.role as string
+                session.user.organizationId = token.organizationId as string || null
+            }
+            return session
+        }
+    },
 })

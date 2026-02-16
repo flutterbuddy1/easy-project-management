@@ -23,7 +23,17 @@ export default async function DashboardLayout({
             email: true,
             fullName: true,
             avatarUrl: true,
-            role: true
+            role: true, // Keep for backward compatibility
+            roleRel: {
+                select: {
+                    name: true,
+                    permissions: {
+                        select: {
+                            action: true
+                        }
+                    }
+                }
+            }
         }
     })
 

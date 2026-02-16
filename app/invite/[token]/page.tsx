@@ -159,12 +159,12 @@ export default async function InvitePage({ params }: InvitePageProps) {
                     </Alert>
 
                     <div className="space-y-3">
-                        <Link href={`/auth/signup?email=${encodeURIComponent(invitation.email)}`}>
+                        <Link href={`/auth/signup?email=${encodeURIComponent(invitation.email)}&token=${params.token}`}>
                             <Button className="w-full" size="lg">
                                 Sign Up & Accept Invitation
                             </Button>
                         </Link>
-                        <Link href={`/auth/login?email=${encodeURIComponent(invitation.email)}`}>
+                        <Link href={`/auth/login?email=${encodeURIComponent(invitation.email)}&token=${params.token}`}>
                             <Button variant="outline" className="w-full">
                                 Already have an account? Log In
                             </Button>

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, Suspense } from 'react'
-import { signIn } from 'next-auth/react'
+import { useState, useEffect, Suspense } from 'react'
+import { signIn, useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -9,16 +9,27 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { acceptInvitation } from '@/app/actions/invitations'
 
 function LoginForm() {
     const router = useRouter()
+    const { update } = useSession()
     const searchParams = useSearchParams()
     const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
+    const token = searchParams.get('token')
+    const emailParam = searchParams.get('email')
 
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
+
+    // Autofill email if present
+    useEffect(() => {
+        if (emailParam) {
+            setEmail(emailParam)
+        }
+    }, [emailParam])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -34,13 +45,28 @@ function LoginForm() {
 
             if (result?.error) {
                 setError('Invalid email or password')
+                setLoading(false)
             } else {
+                // Auto-accept invitation if token exists
+                if (token) {
+                    try {
+                        const inviteResult = await acceptInvitation(token)
+                        if (!inviteResult.success) {
+                            console.error('Failed to auto-accept invite on login:', inviteResult.error)
+                        } else {
+                            // Force session update to get new role/orgId
+                            await update()
+                        }
+                    } catch (inviteError) {
+                        console.error('Error accepting invitation on login:', inviteError)
+                    }
+                }
+
                 router.push(callbackUrl)
                 router.refresh()
             }
         } catch (error) {
             setError('An error occurred. Please try again.')
-        } finally {
             setLoading(false)
         }
     }
@@ -54,7 +80,9 @@ function LoginForm() {
             <CardHeader className="space-y-1">
                 <CardTitle className="text-2xl font-bold">Sign in</CardTitle>
                 <CardDescription>
-                    Enter your email and password to access your account
+                    {token
+                        ? "Log in to accept your invitation"
+                        : "Enter your email and password to access your account"}
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -74,7 +102,8 @@ function LoginForm() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            disabled={loading}
+                            disabled={loading || !!(token && emailParam)} // Lock if invited
+                            className={token && emailParam ? "bg-muted" : ""}
                         />
                     </div>
                     <div className="space-y-2">
@@ -89,7 +118,7 @@ function LoginForm() {
                         />
                     </div>
                     <Button type="submit" className="w-full" disabled={loading}>
-                        {loading ? 'Signing in...' : 'Sign in'}
+                        {loading ? 'Signing in...' : (token ? 'Sign In & Accept Invite' : 'Sign in')}
                     </Button>
                 </form>
 
@@ -135,7 +164,7 @@ function LoginForm() {
             <CardFooter>
                 <p className="text-center text-sm text-muted-foreground w-full">
                     Don&apos;t have an account?{' '}
-                    <Link href="/auth/signup" className="text-primary hover:underline">
+                    <Link href={`/auth/signup${token ? `?email=${encodeURIComponent(emailParam || '')}&token=${token}` : ''}`} className="text-primary hover:underline">
                         Sign up
                     </Link>
                 </p>

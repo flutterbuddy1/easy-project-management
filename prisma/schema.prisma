@@ -17,12 +17,17 @@ model User {
   fullName       String?  @map("full_name") @db.VarChar(255)
   avatarUrl      String?  @map("avatar_url") @db.VarChar(500)
   organizationId String?  @map("organization_id")
-  role           String   @default("member") @db.VarChar(50)
+  role           String   @default("member") @db.VarChar(50) // Deprecated, use roleId
+  roleId         String?  @map("role_id")
+  
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
+  emailNotifications Boolean @default(true) @map("email_notifications")
 
+  roleRel         Role?          @relation(fields: [roleId], references: [id])
   organization    Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   createdProjects Project[]      @relation("CreatedProjects")
+  leadProjects    Project[]      @relation("ProjectLead")
   assignedTasks   Task[]         @relation("AssignedTasks")
   createdTasks    Task[]         @relation("CreatedTasks")
   comments        Comment[]
@@ -31,9 +36,38 @@ model User {
   sessions        Session[]
   notifications   Notification[]
   messages        Message[]
+  uploads         File[]
 
   @@index([organizationId])
+  @@index([roleId])
   @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // 'admin', 'manager', 'custom_role'
+  displayName String   // 'Administrator', 'Project Manager'
+  description String?
+  isSystem    Boolean  @default(false) // Prevent deletion of core roles
+  
+  users       User[]
+  permissions Permission[]
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  action      String   @unique // 'create:task', 'view:dashboard'
+  group       String   // 'task', 'project', 'settings'
+  description String?
+  
+  roles       Role[]
+
+  @@map("permissions")
 }
 
 model Account {
@@ -85,6 +119,7 @@ model Organization {
 
   users       User[]
   projects    Project[]
+  customers   Customer[]
   invitations Invitation[]
 
   @@map("organizations")
@@ -100,14 +135,50 @@ model Project {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
+  assignedLeadId String?  @map("assigned_lead_id")
+  assignedLead   User?    @relation("ProjectLead", fields: [assignedLeadId], references: [id], onDelete: SetNull)
+
+  clientName      String?   @map("client_name") @db.VarChar(255)
+  clientPhone     String?   @map("client_phone") @db.VarChar(50)
+  clientEmail     String?   @map("client_email") @db.VarChar(255)
+  projectType     String    @default("website") @map("project_type") @db.VarChar(50)
+  totalAmount     Decimal?  @map("total_amount") @db.Decimal(10, 2)
+  advanceAmount   Decimal?  @map("advance_amount") @db.Decimal(10, 2)
+  deadline        DateTime?
+  revisionLimit   Int       @default(2) @map("revision_limit")
+  priority        String    @default("medium") @db.VarChar(50)
+  maintenancePlan Boolean   @default(false) @map("maintenance_plan")
+  customerId      String?   @map("customer_id")
+  notifyClient    Boolean   @default(true) @map("notify_client")
+
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy    User         @relation("CreatedProjects", fields: [createdById], references: [id])
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
   tasks        Task[]
   messages     Message[]
+  files        File[]
 
   @@index([organizationId])
   @@index([createdById])
+  @@index([assignedLeadId])
+  @@index([customerId])
   @@map("projects")
+}
+
+model Customer {
+  id             String   @id @default(uuid())
+  name           String   @db.VarChar(255)
+  email          String?  @db.VarChar(255)
+  phone          String?  @db.VarChar(50)
+  organizationId String   @map("organization_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projects     Project[]
+
+  @@index([organizationId])
+  @@map("customers")
 }
 
 model Task {
@@ -142,6 +213,9 @@ model Comment {
   userId    String   @map("user_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  type      String   @default("user") @db.VarChar(50) // user, system
+  fileUrl   String?  @map("file_url") @db.Text
+  fileName  String?  @map("file_name") @db.VarChar(255)
 
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id])
@@ -206,4 +280,22 @@ model Message {
   @@index([projectId])
   @@index([userId])
   @@map("messages")
+}
+
+model File {
+  id        String   @id @default(uuid())
+  name      String   @db.VarChar(255)
+  url       String   @db.Text
+  size      Int
+  type      String   @db.VarChar(100)
+  projectId String   @map("project_id")
+  uploadedById String @map("uploaded_by_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy User    @relation(fields: [uploadedById], references: [id])
+
+  @@index([projectId])
+  @@index([uploadedById])
+  @@map("files")
 }

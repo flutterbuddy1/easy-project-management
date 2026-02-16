@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select'
 import { User, Tag, AlertCircle } from 'lucide-react'
 import { updateTask } from '@/app/actions/tasks'
+import { io, Socket } from 'socket.io-client'
 
 interface TaskMetadataSidebarProps {
     task: {
@@ -41,20 +42,66 @@ interface TaskMetadataSidebarProps {
 export function TaskMetadataSidebar({ task, users }: TaskMetadataSidebarProps) {
     const [isUpdating, setIsUpdating] = useState(false)
     const router = useRouter()
+    const [socket, setSocket] = useState<Socket | null>(null)
+
+    // We need projectId to emit to the correct room. Assuming task.projectId exists.
+    const projectId = task.projectId
+
+    useEffect(() => {
+        const socketInstance = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000')
+
+        socketInstance.on('connect', () => {
+            console.log('Sidebar Socket connected')
+            socketInstance.emit('join-project', projectId)
+        })
+
+        socketInstance.on('task-updated', (data: any) => {
+            if (data.taskId === task.id) {
+                console.log('Task updated externally, refreshing...')
+                router.refresh()
+            }
+        })
+
+        setSocket(socketInstance)
+
+        return () => {
+            socketInstance.disconnect()
+        }
+    }, [projectId, task.id, router])
 
     const handleUpdate = async (field: 'status' | 'priority' | 'assigneeId', value: string) => {
         setIsUpdating(true)
 
-        const result = await updateTask(task.id, {
+        const updateData = {
             title: task.title,
             description: task.description,
             status: field === 'status' ? value : task.status,
             priority: field === 'priority' ? value : task.priority,
             assigneeId: field === 'assigneeId' ? (value === 'unassigned' ? null : value) : task.assigneeId,
             projectId: task.projectId,
-        })
+        }
+
+        const result = await updateTask(task.id, updateData)
 
         if (result.success) {
+            // Emitting system comment if one was generated
+            if (socket) {
+                if (result.systemComment) {
+                    socket.emit('task-comment', {
+                        ...result.systemComment,
+                        createdAt: result.systemComment.createdAt.toISOString(),
+                        updatedAt: result.systemComment.updatedAt.toISOString(),
+                        projectId: task.projectId
+                    })
+                }
+
+                // Emit task-updated to sync other clients
+                socket.emit('task-updated', {
+                    ...updateData,
+                    taskId: task.id,
+                    projectId: task.projectId
+                })
+            }
             router.refresh()
         } else {
             alert(result.error || 'Failed to update task')

@@ -10,18 +10,22 @@ import {
     Users,
     Bell,
     Settings,
-    Layers
+    Layers,
+    Building2,
+    Shield
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { hasPermission, PERMISSIONS } from '@/lib/permissions'
 
 const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-
-    { name: 'Projects', href: '/dashboard/projects', icon: FolderKanban },
-    { name: 'My Tasks', href: '/dashboard/tasks', icon: CheckSquare },
-    { name: 'Team', href: '/dashboard/team', icon: Users },
-    { name: 'Notifications', href: '/dashboard/notifications', icon: Bell },
-    { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission: null },
+    { name: 'Projects', href: '/dashboard/projects', icon: FolderKanban, permission: PERMISSIONS.VIEW_PROJECT },
+    { name: 'Customers', href: '/dashboard/customers', icon: Building2, permission: PERMISSIONS.MANAGE_CUSTOMERS },
+    { name: 'My Tasks', href: '/dashboard/tasks', icon: CheckSquare, permission: PERMISSIONS.VIEW_TASK },
+    { name: 'Team', href: '/dashboard/team', icon: Users, permission: PERMISSIONS.VIEW_TEAM }, // Changed to VIEW_TEAM
+    { name: 'Notifications', href: '/dashboard/notifications', icon: Bell, permission: null },
+    { name: 'Roles', href: '/dashboard/settings/roles', icon: Shield, permission: PERMISSIONS.VIEW_ROLES },
+    { name: 'Settings', href: '/dashboard/settings', icon: Settings, permission: PERMISSIONS.VIEW_SETTINGS },
 ]
 
 interface User {
@@ -30,6 +34,10 @@ interface User {
     fullName: string | null
     avatarUrl: string | null
     role: string
+    roleRel?: {
+        name: string
+        permissions: { action: string }[]
+    } | null
 }
 
 interface SidebarProps {
@@ -44,22 +52,49 @@ export function Sidebar({ user, className }: SidebarProps) {
         <div className={cn("flex h-full w-64 flex-col border-r bg-card", className)}>
             {/* Logo */}
             <div className="flex h-16 items-center border-b px-6">
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    PM Tool
-                </h1>
+                <Link href="/dashboard">
+                    <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                        PM Tool
+                    </h1>
+                </Link>
             </div>
 
             {/* Navigation */}
             <nav className="flex-1 space-y-1 px-3 py-4">
-                {navigation.map((item) => {
+                {navigation.filter(item => {
+                    // If no permission required, show it
+                    if (!item.permission) return true
+
+                    // Check logic: 
+                    // 1. Check object-based permission (roleRel)
+                    // 2. Check string-based permission (role) - backward compatibility
+                    return hasPermission(user.roleRel || user.role, item.permission)
+                }).map((item, index, allItems) => {
                     let isActive = false
 
                     if (item.href === '/dashboard') {
                         // Exact match for dashboard root
                         isActive = pathname === '/dashboard'
                     } else {
-                        // Prefix match for others (e.g., /dashboard/projects matches /dashboard/projects/123)
-                        isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
+                        // Check if this item matches
+                        const matchesParams = pathname === item.href || pathname?.startsWith(item.href + '/')
+
+                        if (matchesParams) {
+                            // Check if there is a more specific match in the list
+                            // e.g. if we are on /dashboard/settings/roles
+                            // 'Settings' (/dashboard/settings) matches
+                            // 'Roles' (/dashboard/settings/roles) matches
+                            // We want to disable 'Settings' if 'Roles' is also a match
+                            const hasMoreSpecificMatch = allItems.some(otherItem =>
+                                otherItem !== item &&
+                                otherItem.href.length > item.href.length &&
+                                (pathname === otherItem.href || pathname?.startsWith(otherItem.href + '/')) &&
+                                // Ensure the other item is actually rendered (authorized)
+                                (otherItem.permission ? hasPermission(user.role, otherItem.permission) : true)
+                            )
+
+                            isActive = !hasMoreSpecificMatch
+                        }
                     }
                     return (
                         <Link
@@ -90,7 +125,9 @@ export function Sidebar({ user, className }: SidebarProps) {
                     </Avatar>
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{user.fullName || 'User'}</p>
-                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        <p className="text-xs text-muted-foreground truncate capitalize">
+                            {user.role}
+                        </p>
                     </div>
                 </div>
             </div>

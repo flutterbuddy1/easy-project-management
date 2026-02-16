@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Plus, Users } from 'lucide-react'
 import { InviteMemberDialog } from '@/components/team/InviteMemberDialog'
+import { MemberActions, InvitationActions } from '@/components/team/TeamActions'
 
 export default async function TeamPage() {
     const session = await auth()
@@ -18,7 +19,7 @@ export default async function TeamPage() {
     // Get user's organization
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
-        select: { organizationId: true }
+        select: { id: true, organizationId: true, role: true }
     })
 
     if (!user?.organizationId) {
@@ -70,7 +71,16 @@ export default async function TeamPage() {
             {teamMembers && teamMembers.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {teamMembers.map((member) => (
-                        <Card key={member.id}>
+                        <Card key={member.id} className="relative overflow-visible">
+                            <div className="absolute top-2 right-2 z-50">
+                                <MemberActions
+                                    key={member.id} // Explicit key for MemberActions
+                                    memberId={member.id}
+                                    currentRole={member.role}
+                                    currentUserId={user.id}
+                                    currentUserRole={user.role}
+                                />
+                            </div>
                             <CardHeader>
                                 <div className="flex items-center gap-4">
                                     <Avatar className="h-12 w-12">
@@ -137,7 +147,10 @@ export default async function TeamPage() {
                                                 Invited {new Date(invitation.createdAt).toLocaleDateString()} • {invitation.role}
                                             </p>
                                         </div>
-                                        <Badge variant="outline">Pending</Badge>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline">Pending</Badge>
+                                            <InvitationActions invitationId={invitation.id} />
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>

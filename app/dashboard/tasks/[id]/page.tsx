@@ -154,10 +154,14 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
                     {/* Comments */}
                     <TaskComments
                         taskId={task.id}
+                        projectId={task.project.id}
                         comments={comments.map(c => ({
                             ...c,
                             createdAt: c.createdAt.toISOString(),
                             updatedAt: c.updatedAt.toISOString(),
+                            type: c.type || 'user', // Ensure default
+                            fileUrl: c.fileUrl,
+                            fileName: c.fileName,
                             user: {
                                 ...c.user,
                                 fullName: c.user.fullName,

@@ -25,17 +25,10 @@ io.on('connection', (socket: Socket) => {
     console.log('Client connected:', socket.id)
 
     socket.on('join-project', (data: string | { projectId: string; userId?: string }) => {
-        // Handle both string and object payloads for backward compatibility
         const projectId = typeof data === 'string' ? data : data.projectId
-        const userId = typeof data === 'object' ? data.userId : undefined
-
         socket.join(projectId)
         console.log(`Socket ${socket.id} joined project: ${projectId}`)
-
-        if (userId) {
-            socket.join(`user:${userId}`)
-            console.log(`Socket ${socket.id} joined user room: user:${userId}`)
-        }
+        console.log(`Socket ${socket.id} rooms:`, socket.rooms)
     })
 
     socket.on('leave-project', (projectId: string) => {
@@ -43,25 +36,21 @@ io.on('connection', (socket: Socket) => {
         console.log(`Socket ${socket.id} left project: ${projectId}`)
     })
 
-    socket.on('join-user', (userId: string) => {
-        socket.join(`user:${userId}`)
-        console.log(`Socket ${socket.id} joined user room: user:${userId}`)
-    })
+    // Task Comment Events
+    socket.on('task-comment', (data: any) => {
+        console.log(`Server received task-comment for project ${data.projectId} from ${socket.id}`)
+        console.log(`Broadcasting to room: ${data.projectId}`)
 
-    // Kanban Events
-    socket.on('task-moved', (data: any) => {
         // Broadcast to everyone else in the project room
-        socket.to(data.projectId).emit('task-updated', data)
-        console.log(`Task moved in project ${data.projectId} by ${socket.id}`)
+        const result = socket.to(data.projectId).emit('new-comment', data)
+        console.log(`Broadcasted new-comment to room ${data.projectId}`)
     })
 
-    // Chat Events
-    socket.on('send-message', (data: any) => {
-        // Broadcast to everyone else (exclude sender)
-        socket.to(data.projectId).emit('new-message', data)
-        if (data.content) {
-            console.log(`Message sent in project ${data.projectId} by ${socket.id}`)
-        }
+    // Task Update Events (Status, Priority, Assignee)
+    socket.on('task-updated', (data: any) => {
+        console.log(`Server received task-updated for project ${data.projectId} from ${socket.id}`)
+        socket.to(data.projectId).emit('task-updated', data)
+        console.log(`Broadcasted task-updated to room ${data.projectId}`)
     })
 
     // Typing Indicators (Optional)

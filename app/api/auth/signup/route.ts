@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
     try {
-        const { fullName, email, password } = await request.json()
+        const { fullName, email, password, token } = await request.json()
 
         // Validate input
         if (!email || !password) {
@@ -49,6 +49,39 @@ export async function POST(request: NextRequest) {
                 fullName: true,
             }
         })
+
+        // Handle invitation if token provided
+
+        if (token) {
+            try {
+                const invitation = await prisma.invitation.findUnique({
+                    where: { token, status: 'pending' }
+                })
+
+                if (invitation && invitation.email === email && invitation.expiresAt > new Date()) {
+                    // Update user with org and role
+                    await prisma.user.update({
+                        where: { id: user.id },
+                        data: {
+                            organizationId: invitation.organizationId,
+                            role: invitation.role
+                        }
+                    })
+
+                    // Mark invitation as accepted
+                    await prisma.invitation.update({
+                        where: { id: invitation.id },
+                        data: {
+                            status: 'accepted',
+                            acceptedAt: new Date()
+                        }
+                    })
+                }
+            } catch (inviteError) {
+                console.error('Error auto-accepting invite during signup:', inviteError)
+                // Continue, don't fail signup
+            }
+        }
 
         return NextResponse.json(
             { success: true, user },

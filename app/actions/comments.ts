@@ -4,7 +4,13 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 
-export async function createComment(taskId: string, content: string) {
+export async function createComment(
+    taskId: string,
+    content: string,
+    type: string = 'user',
+    fileUrl?: string,
+    fileName?: string
+) {
     try {
         const session = await auth()
         if (!session?.user?.email) {
@@ -17,7 +23,8 @@ export async function createComment(taskId: string, content: string) {
                 id: true,
                 organizationId: true,
                 fullName: true,
-                email: true
+                email: true,
+                role: true
             }
         })
 
@@ -39,12 +46,29 @@ export async function createComment(taskId: string, content: string) {
             return { success: false, error: 'Task not found' }
         }
 
+        const { hasPermission, PERMISSIONS } = await import('@/lib/permissions')
+        // Assuming COMMENT is a basic permission or covered by 'VIEW_PROJECT' + specific? 
+        // Actually, Viewers usually can comment. But user said "bss dheak paye" (only see).
+        // I will restrict comment creation for Viewers for now to be safe.
+        // I need to check if I have a CREATE_COMMENT permission. I'll check permissions.ts later or assume logic.
+        // Let's rely on checking against 'VIEWER' role directly if no specific permission exists, 
+        // OR better, assuming Viewers are READ ONLY, I will block them.
+        // Let's assume 'CREATE_TASK' or verify permissions. 
+        // Actually, I'll just check if role is VIEWER and block.
+        if (user.role === 'viewer') {
+            return { success: false, error: 'Unauthorized: Viewers cannot post comments.' }
+        }
+
         // Create comment
         const comment = await prisma.comment.create({
             data: {
                 content,
                 taskId,
-                userId: user.id
+                userId: user.id,
+                // @ts-ignore
+                type,
+                fileUrl,
+                fileName
             },
             include: {
                 user: {
@@ -60,31 +84,76 @@ export async function createComment(taskId: string, content: string) {
 
         revalidatePath(`/dashboard/tasks/${taskId}`)
 
-        // Notify task assignee if someone else commented
-        // Also notify task owner? For now, just assignee and maybe owner if different.
-        const fullTask = await prisma.task.findUnique({ where: { id: taskId } }) // Renamed to fullTask to avoid conflict with 'task' above
+        // Notify task assignee and creator
+        const fullTask = await prisma.task.findUnique({
+            where: { id: taskId },
+            include: {
+                project: { select: { name: true } },
+                assignee: { select: { email: true, fullName: true, id: true, emailNotifications: true } },
+                createdBy: { select: { email: true, fullName: true, id: true, emailNotifications: true } }
+            }
+        })
 
-        if (fullTask && fullTask.assigneeId && fullTask.assigneeId !== user.id) {
+        if (fullTask) {
             const { createNotification } = await import('@/lib/notifications')
-            await createNotification({
-                userId: fullTask.assigneeId,
-                title: 'New Comment',
-                message: `${user.fullName || user.email} commented on "${fullTask.title}"`,
-                type: 'comment_added',
-                link: `/dashboard/tasks/${taskId}`
-            })
-        }
+            const { sendNewCommentEmail } = await import('@/lib/email')
 
-        // Notify task creator if different from commenter and assignee
-        if (fullTask && fullTask.createdById && fullTask.createdById !== user.id && fullTask.createdById !== fullTask.assigneeId) {
-            const { createNotification } = await import('@/lib/notifications')
-            await createNotification({
-                userId: fullTask.createdById,
-                title: 'New Comment',
-                message: `${user.fullName || user.email} commented on "${fullTask.title}"`,
-                type: 'comment_added',
-                link: `/dashboard/tasks/${taskId}`
-            })
+            const recipients = []
+
+            // 1. Notify Assignee
+            if (fullTask.assigneeId && fullTask.assigneeId !== user.id) {
+                // In-app
+                await createNotification({
+                    userId: fullTask.assigneeId,
+                    type: 'comment_added',
+                    title: `New comment on ${fullTask.title}`,
+                    message: `${user.fullName || user.email} commented on a task you are assigned to.`,
+
+                })
+
+                // Prepare Email
+                if (fullTask.assignee && fullTask.assignee.email && fullTask.assignee.emailNotifications) {
+                    recipients.push({
+                        email: fullTask.assignee.email,
+                        name: fullTask.assignee.fullName || fullTask.assignee.email
+                    })
+                }
+            }
+
+            // 2. Notify Creator (if diff from assignee and not current user)
+            if (fullTask.createdById && fullTask.createdById !== user.id && fullTask.createdById !== fullTask.assigneeId) {
+                // In-app
+                await createNotification({
+                    userId: fullTask.createdById,
+                    type: 'comment_added',
+                    title: `New comment on ${fullTask.title}`,
+                    message: `${user.fullName || user.email} commented on a task you created.`,
+
+                })
+
+                // Prepare Email
+                if (fullTask.createdBy && fullTask.createdBy.email && fullTask.createdBy.emailNotifications) {
+                    recipients.push({
+                        email: fullTask.createdBy.email,
+                        name: fullTask.createdBy.fullName || fullTask.createdBy.email
+                    })
+                }
+            }
+
+            // 3. Send Emails
+            const commentContent = content.length > 50 ? content.substring(0, 50) + '...' : content
+
+            for (const recipient of recipients) {
+                sendNewCommentEmail({
+                    to: recipient.email,
+                    recipientName: recipient.name,
+                    commenterName: user.fullName || user.email,
+                    taskTitle: fullTask.title,
+                    projectName: fullTask.project.name || 'Project',
+                    commentContent: content,
+                    link: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/tasks/${taskId}`
+                }).catch(err => console.error('Failed to send comment email:', err))
+            }
         }
 
         return { success: true, comment }

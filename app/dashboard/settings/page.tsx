@@ -52,7 +52,8 @@ export default async function SettingsPage() {
                         fullName: userData.fullName,
                         email: userData.email,
                         role: userData.role,
-                        avatarUrl: userData.avatarUrl
+                        avatarUrl: userData.avatarUrl,
+                        emailNotifications: userData.emailNotifications
                     }} />
                 </CardContent>
             </Card>

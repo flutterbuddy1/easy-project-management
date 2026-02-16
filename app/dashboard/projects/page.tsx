@@ -1,84 +1,70 @@
 import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
-import { Card, CardContent } from '@/components/ui/card'
-import { CreateProjectDialog } from '@/components/project/CreateProjectDialog'
-import { ProjectCard } from '@/components/project/ProjectCard'
-import { FolderKanban } from 'lucide-react'
+import { getProjects, getProjectStats, getOrganizationUsers } from '@/app/actions/projects'
+import { getCustomers } from '@/app/actions/customers'
+import { ProjectSummaryStats } from '@/components/project/ProjectSummaryStats'
+import { DeveloperWorkload } from '@/components/project/DeveloperWorkload'
+import { ProjectList } from '@/components/project/ProjectList'
+
+export const metadata = {
+    title: 'Projects | Dashboard',
+    description: 'Project Control Center',
+}
 
 export default async function ProjectsPage() {
     const session = await auth()
-
     if (!session?.user?.email) {
         redirect('/auth/login')
     }
 
-    // Get user's organization
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true }
-    })
+    // Fetch data in parallel
+    const [projectsData, statsData, usersData, customersData] = await Promise.all([
+        getProjects(),
+        getProjectStats(),
+        getOrganizationUsers(),
+        getCustomers()
+    ])
 
-    if (!user?.organizationId) {
-        redirect('/dashboard')
+    if (!projectsData.success || !statsData.success || !usersData.success || !customersData.success) {
+        // Handle error gracefully or show alert
+        console.error('Failed to load dashboard data')
     }
 
-    // Fetch all projects in organization with task counts
-    const projects = await prisma.project.findMany({
-        where: {
-            organizationId: user.organizationId
-        },
-        include: {
-            createdBy: {
-                select: {
-                    fullName: true,
-                    email: true
-                }
-            },
-            _count: {
-                select: { tasks: true }
-            }
-        },
-        orderBy: {
-            createdAt: 'desc'
-        }
-    })
+    const projects = projectsData.projects || []
+    const stats = statsData.stats || {
+        activeProjects: 0,
+        nearDeadline: 0,
+        overdueProjects: 0,
+        revenueThisMonth: 0,
+        pendingPayments: 0
+    }
+    const workload = statsData.developerWorkload || []
+    const members = usersData.users || []
+    const customers = customersData.customers || []
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold">All Projects</h1>
-                    <p className="text-muted-foreground mt-1">
-                        View and manage all your projects
-                    </p>
-                </div>
-                <CreateProjectDialog />
+        <div className="space-y-8">
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight">Project Control Center</h1>
+                <p className="text-muted-foreground mt-1">
+                    Manage your projects, track revenue, and monitor team workload.
+                </p>
             </div>
 
-            {/* Projects Grid */}
-            {projects && projects.length > 0 ? (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {projects.map((project) => (
-                        <ProjectCard
-                            key={project.id}
-                            project={project}
-                        />
-                    ))}
+            <ProjectSummaryStats stats={stats} />
+
+            <div className="grid gap-8 lg:grid-cols-4">
+                <div className="lg:col-span-3">
+                    <ProjectList
+                        initialProjects={projects}
+                        members={members}
+                        customers={customers}
+                    />
                 </div>
-            ) : (
-                <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-16">
-                        <FolderKanban className="h-16 w-16 text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-semibold mb-2">No projects yet</h3>
-                        <p className="text-muted-foreground text-center mb-4">
-                            Create your first project to get started
-                        </p>
-                        <CreateProjectDialog />
-                    </CardContent>
-                </Card>
-            )}
+                <div className="lg:col-span-1 space-y-6">
+                    <DeveloperWorkload workload={workload} />
+                </div>
+            </div>
         </div>
     )
 }
