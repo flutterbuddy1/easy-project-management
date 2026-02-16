@@ -11,7 +11,7 @@
     "socket": "node dist/socket-server.js",
     "socket:dev": "ts-node --skip-project socket-server.ts",
     "build:socket": "tsc socket-server.ts --outDir dist --module commonjs --esModuleInterop --skipLibCheck",
-    "seed": "ts-node prisma/seed_roles.ts"
+    "seed": "npx tsx prisma/seed_roles.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
