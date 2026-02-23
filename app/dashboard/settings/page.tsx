@@ -1,4 +1,4 @@
-import { auth } from '@/lib/auth'
+import { auth, signOut } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -96,7 +96,22 @@ export default async function SettingsPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between border-b pb-4">
+                        <div>
+                            <p className="font-medium">Sign Out</p>
+                            <p className="text-sm text-muted-foreground">
+                                Log out of your session on this device
+                            </p>
+                        </div>
+                        <form action={async () => {
+                            "use server"
+                            await signOut({ redirectTo: '/auth/login' })
+                        }}>
+                            <Button variant="outline" type="submit">Sign Out</Button>
+                        </form>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
                         <div>
                             <p className="font-medium">Delete Account</p>
                             <p className="text-sm text-muted-foreground">

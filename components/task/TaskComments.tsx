@@ -124,8 +124,8 @@ export function TaskComments({ taskId, comments: initialComments, currentUserId,
 
                 if (data.success) {
                     setAttachment({
-                        fileUrl: data.fileUrl,
-                        fileName: data.fileName
+                        fileUrl: data.file.url,
+                        fileName: data.file.name
                     })
                 } else {
                     alert('Upload failed: ' + data.error)
@@ -277,9 +277,9 @@ export function TaskComments({ taskId, comments: initialComments, currentUserId,
             <div className="space-y-1">
                 <p className="text-sm text-foreground whitespace-pre-wrap">{comment.content}</p>
                 {comment.fileUrl && (
-                    <a href={comment.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 rounded border bg-muted/50 w-fit hover:bg-muted transition-colors mt-2">
+                    <a href={comment.fileUrl} target="_blank" rel="noopener noreferrer" download={comment.fileName || 'file'} className="flex items-center gap-2 p-2 rounded border bg-muted/50 w-fit hover:bg-muted transition-colors mt-2">
                         <FileText className="h-4 w-4 text-blue-500" />
-                        <span className="text-xs underline text-blue-600">{comment.fileName || 'Attached File'}</span>
+                        <span className="text-xs underline text-blue-600 truncate max-w-[200px]">{comment.fileName || 'Attached File'}</span>
                     </a>
                 )}
             </div>
@@ -327,7 +327,7 @@ export function TaskComments({ taskId, comments: initialComments, currentUserId,
 
 
     return (
-        <Card className="flex flex-col h-full max-h-[600px]">
+        <Card className="flex flex-col h-[500px] md:h-full md:max-h-[600px] shadow-sm border-t-4 border-t-primary/20">
             <CardHeader className="py-3">
                 <CardTitle className="flex items-center justify-between text-base">
                     <div className="flex items-center gap-2">
@@ -437,8 +437,8 @@ export function TaskComments({ taskId, comments: initialComments, currentUserId,
                                 Attach File
                             </Button>
                             <Button type="submit" disabled={isSubmitting || (!newComment.trim() && !attachment) || isUploading} size="sm" className="gap-2">
-                                <Send className="h-4 w-4" />
-                                {isSubmitting ? 'Sending...' : 'Send'}
+                                <Send className="h-4 w-4 md:mr-2" />
+                                <span className="hidden md:inline">{isSubmitting ? 'Sending...' : 'Send'}</span>
                             </Button>
                         </div>
                     </form>

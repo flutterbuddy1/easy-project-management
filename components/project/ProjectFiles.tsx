@@ -148,11 +148,11 @@ export function ProjectFiles({ projectId, currentUserId }: ProjectFilesProps) {
                                     )}
 
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 rounded-md">
-                                        <Link href={file.url} target="_blank" download>
+                                        <a href={file.url} target="_blank" rel="noopener noreferrer" download={file.name}>
                                             <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full">
                                                 <Download className="h-4 w-4" />
                                             </Button>
-                                        </Link>
+                                        </a>
                                         <Button
                                             size="icon"
                                             variant="destructive"
