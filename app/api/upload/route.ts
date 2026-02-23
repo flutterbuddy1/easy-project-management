@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
         // Write file
         await writeFile(path, buffer)
 
-        const fileUrl = `/uploads/${finalFilename}`
+        const fileUrl = `/api/uploads/${finalFilename}`
 
         // Save to Database
         const dbFile = await prisma.file.create({

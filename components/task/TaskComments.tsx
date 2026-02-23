@@ -113,6 +113,8 @@ export function TaskComments({ taskId, comments: initialComments, currentUserId,
 
             const formData = new FormData()
             formData.append('file', file)
+            if (projectId) formData.append('projectId', projectId)
+            if (currentUserId) formData.append('userId', currentUserId)
 
             try {
                 const response = await fetch('/api/upload', {
